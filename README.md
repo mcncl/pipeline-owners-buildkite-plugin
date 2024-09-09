@@ -46,7 +46,7 @@ steps:
   - label: ":pipeline: Upload pipeline"
     command: buildkite-agent pipeline upload
     plugins:
-        pipeline-owners-buildkite-plugin#v1.0.0:
+        mcncl/pipeline-owners-buildkite-plugin#v1.0.0:
             method: slack_channel
 ```
 
@@ -57,7 +57,7 @@ steps:
   - label: ":pipeline: Upload pipeline"
     command: buildkite-agent pipeline upload
     plugins:
-        pipeline-owners-buildkite-plugin#v1.0.0:
+        mcncl/pipeline-owners-buildkite-plugin#v1.0.0:
             owners_file: configs/buildkite/PIPELINEOWNERS
             method: slack_channel
 ```
