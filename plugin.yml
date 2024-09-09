@@ -1,0 +1,14 @@
+name: Pipeline Owners Buildkite Plugin  
+description: Introduces the concept of "owners" to a Pipeline, using a PIPELINEOWNERS file to automatically alert on build states.
+author: https://github.com/mcncl
+requirements:
+  - bash
+configuration:
+  properties:
+    method:
+      type: string
+    owners_file:
+      type: string
+  required:
+    - method
+  additionalProperties: false

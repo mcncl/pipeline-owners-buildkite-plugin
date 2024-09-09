@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+DIR="$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
+
+# shellcheck source=lib/plugin.bash
+. "$DIR/../lib/plugin.bash"
+
+REQUIRED_PIPELINE="${BUILDKITE_ORGANIZATION_SLUG}/${BUILDKITE_PIPELINE_SLUG}"
+OWNERS_FILE=$(plugin_read_config "OWNERS_FILE")
+OWNERS_FILE="${OWNERS_FILE:-.buildkite/PIPELINEOWNERS}"
+METHOD=$(plugin_read_config "METHOD")
+
+check_config() {
+  if [ ! -f "$OWNERS_FILE" ]; then
+    echo "🚨 Error: owners file $OWNERS_FILE not found"
+    exit 1
+  fi
+
+  if [ -z "$METHOD" ]; then
+    echo "🚨 Error: no METHOD set"
+    exit 1
+  fi
+}
+
+parse_owner_info() {
+  local config=""
+  config=$(grep "${REQUIRED_PIPELINE}" "${OWNERS_FILE}" | sed 's/^[^ ]* //' || true)
+  
+  if [ -z "$config" ]; then
+    echo "Warning: No matching pipeline found in ${OWNERS_FILE}"
+    return 1
+  fi
+
+  local slack_handle=""
+  local slack_channel=""
+  local email_address=""
+
+  slack_handle=$(echo "${config}" | grep -o '@[^ ]\+' | head -1 || true)
+  slack_channel=$(echo "${config}" | grep -o '#[^ ]\+' | head -1 || true)
+  email_address=$(echo "${config}" | grep -o '[A-Za-z0-9._%+-]\+@[A-Za-z0-9.-]\+\.[A-Za-z]\{2,4\}' | head -1 || true)
+
+  if [ -z "$slack_handle" ] && [ -z "$slack_channel" ] && [ -z "$email_address" ]; then
+    echo "Warning: No valid contact information found"
+    return 1
+  fi
+
+  case "$METHOD" in
+    slack_channel)
+      if [ -n "$slack_channel" ]; then
+        notify "slack" "$slack_channel" 
+      else
+        echo "Warning: Cannot notify via Slack. No channel set in OWNERS file."
+      fi
+      ;;
+    slack_handle)
+      if [ -n "$slack_handle" ]; then
+        notify "slack" "$slack_handle" 
+      else
+        echo "Warning: Cannot notify via Slack. No Slack handle or team name found."
+      fi
+      ;;
+    email)
+      if [ -n "$email_address" ]; then
+        notify "email" "$email_address"
+      else
+        echo "Warning: Cannot notify via email. No email address found."
+      fi
+      ;;
+    "")
+      ;;
+    *)
+      echo "Error: invalid notification method '$METHOD'. Supported methods are 'slack_handle', 'slack_channel', and 'email'."
+      exit 1
+      ;;
+  esac
+
+  return 0
+}
+
+notify(){
+  local target="$2"
+  target=$(echo "$target" | sed 's/"/\\"/g')
+  cat << YAML | buildkite-agent pipeline upload >/dev/null
+notify:
+  - $1: "$target"
+YAML
+}
+
+main() {
+  check_config
+  parse_owner_info
+}
+
+main
